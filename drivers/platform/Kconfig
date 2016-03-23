@@ -1,0 +1,14 @@
+if X86
+source "drivers/platform/x86/Kconfig"
+endif
+if GOLDFISH
+source "drivers/platform/goldfish/Kconfig"
+endif
+
+if ARCH_MSM
+source "drivers/platform/ckt/Kconfig"
+source "drivers/platform/longcheer/Kconfig"
+source "drivers/platform/msm/Kconfig"
+source "drivers/platform/haier/Kconfig"
+source "drivers/platform/wingtech/Kconfig"
+endif
