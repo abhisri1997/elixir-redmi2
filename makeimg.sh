@@ -11,8 +11,8 @@ echo "Cleaning up the directory for the fresh build......"
 echo "Unpacking boot image now......"
 ./unpackimg.sh boot.img
 echo "Moving and replacing the files for repacking...."
-mv ~/Output/Redmi2/raw/zImage ~/Output/Redmi2/convert/boot.img-zImage
-mv ~/Output/Redmi2/raw/dt.img ~/Output/Redmi2/convert/boot.img-dtb
+mv ~/Output/Redmi2/raw/zImage ~/Output/Redmi2/convert/split_img/boot.img-zImage
+mv ~/Output/Redmi2/raw/dt.img ~/Output/Redmi2/convert/split_img/boot.img-dtb
 echo -e "Done replacing......\n\n"
 echo "Now repacking kernel to boot.img..........."
 ./repackimg.sh
