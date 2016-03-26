@@ -19,7 +19,7 @@ echo "Now repacking kernel to boot.img..........."
 echo "Geting your boot.img file......"
 cp ~/Output/Redmi2/convert/image-new.img ~/Output/Redmi2/image/
 cd ~/Output/Redmi2/image/
-build_date=$(date '+ %d%m%y')
+build_date=$(date '+%d%m%y')
 for file in image-new*
 do
   mv "$file" "boot-$build_date${file#image-new}"
