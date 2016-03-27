@@ -33,6 +33,12 @@
 #include <linux/input/ft5x06_ts.h>
 #include <linux/power_supply.h>
 
+
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+#include <linux/input/doubletap2wake.h>
+#endif
+ 
+
 #if defined(CONFIG_FB)
 #include <linux/notifier.h>
 #include <linux/fb.h>
@@ -1209,6 +1215,13 @@ static int ft5x06_ts_suspend(struct device *dev)
 	struct ft5x06_ts_data *data = dev_get_drvdata(dev);
 	int err;
 
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+ 	bool prevent_sleep = (dt2w_switch > 0);
+ 	if (prevent_sleep) {
+ 		disable_irq_wake(data->client->irq);
+ 	} else {
+ #endif
+
 	if (data->loading_fw) {
 		dev_info(dev, "Firmware loading in process...\n");
 		return 0;
@@ -1243,7 +1256,9 @@ static int ft5x06_ts_suspend(struct device *dev)
 		data->suspended = true;
 		return err;
 	}
-
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+	}
+#endif
 	return ft5x06_ts_stop(dev);
 }
 
@@ -1251,6 +1266,13 @@ static int ft5x06_ts_resume(struct device *dev)
 {
 	struct ft5x06_ts_data *data = dev_get_drvdata(dev);
 	int err;
+
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+ 	bool prevent_sleep = (dt2w_switch > 0);
+ 	if (prevent_sleep) {
+ 		enable_irq_wake(data->client->irq);
+ 	} else {
+ #endif
 
 	if (!data->suspended) {
 		dev_dbg(dev, "Already in awake state\n");
@@ -1300,6 +1322,10 @@ static int ft5x06_ts_resume(struct device *dev)
 		data->suspended = false;
 		data->gesture_pdata->in_pocket = 0;
 	}
+
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+ 	}
+ #endif
 	return 0;
 }
 
@@ -1333,6 +1359,14 @@ static int fb_notifier_callback(struct notifier_block *self,
 	struct ft5x06_ts_data *ft5x06_data =
 		container_of(self, struct ft5x06_ts_data, fb_notif);
 
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+ 	bool prevent_sleep = (dt2w_switch > 0);
+ 			if (prevent_sleep) {
+ 				ft5x06_ts_resume(&ft5x06_data->client->dev);
+ 				return 0;
+ 			} else {
+ #endif
+
 	if (evdata && evdata->data && event == FB_EVENT_BLANK &&
 			ft5x06_data && ft5x06_data->client) {
 		blank = evdata->data;
@@ -1345,6 +1379,9 @@ static int fb_notifier_callback(struct notifier_block *self,
 		}
 	}
 
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+	}
+#endif
 	return 0;
 }
 #elif defined(CONFIG_HAS_EARLYSUSPEND)
@@ -2299,8 +2336,14 @@ static int ft5x06_ts_probe(struct i2c_client *client,
 	* the interrupt trigger mode will be set in Device Tree with property
 	* "interrupts", so here we just need to set the flag IRQF_ONESHOT
 	*/
+
+#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
+ 	IRQF_ONESHOT | IRQF_NO_SUSPEND,
+ 	client->dev.driver->name, data);
+#else
 				IRQF_ONESHOT,
 				client->dev.driver->name, data);
+#endif
 	if (err) {
 		dev_err(&client->dev, "request irq failed\n");
 		goto free_gpio;
