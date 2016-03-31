@@ -37,24 +37,13 @@ unsigned int msm8x16_wcd_read(struct snd_soc_codec *codec, unsigned int reg);
 int msm8x16_wcd_write(struct snd_soc_codec *codec, unsigned int reg,
 		unsigned int value);
 
-
-static unsigned int cached_regs[] = {6, 6, 0, 0, 0, 0, 0, 0, 0, 0,
-			    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			    0 };
+static unsigned int cached_regs[] = { 0, 0, 0 };
 
 static unsigned int *cache_select(unsigned int reg)
 {
 	unsigned int *out = NULL;
 
         switch (reg) {
-/*
-		case MSM8X16_WCD_A_RX_HPH_L_GAIN:
-			out = &cached_regs[0];
-			break;
-                case MSM8X16_WCD_A_RX_HPH_R_GAIN:
-			out = &cached_regs[1];
-			break;
-*/
                 case MSM8X16_WCD_A_CDC_RX1_VOL_CTL_B2_CTL:
 			out = &cached_regs[4];
 			break;
@@ -63,12 +52,6 @@ static unsigned int *cache_select(unsigned int reg)
 			break;
                 case MSM8X16_WCD_A_CDC_RX3_VOL_CTL_B2_CTL:
 			out = &cached_regs[6];
-			break;
-                case MSM8X16_WCD_A_CDC_TX1_VOL_CTL_GAIN:
-			out = &cached_regs[11];
-			break;
-                case MSM8X16_WCD_A_CDC_TX2_VOL_CTL_GAIN:
-			out = &cached_regs[12];
 			break;
         }
 	return out;
@@ -97,23 +80,9 @@ int snd_hax_reg_access(unsigned int reg)
 	int ret = 1;
 
 	switch (reg) {
-/*
-		case MSM8X16_WCD_A_RX_HPH_L_GAIN:
-		case MSM8X16_WCD_A_RX_HPH_R_GAIN:
-		case MSM8X16_WCD_A_RX_HPH_L_STATUS:
-		case MSM8X16_WCD_A_RX_HPH_R_STATUS:
-			if (snd_ctrl_locked > 1)
-				ret = 0;
-			break;
-*/
 		case MSM8X16_WCD_A_CDC_RX1_VOL_CTL_B2_CTL:
 		case MSM8X16_WCD_A_CDC_RX2_VOL_CTL_B2_CTL:
 		case MSM8X16_WCD_A_CDC_RX3_VOL_CTL_B2_CTL:
-			if (snd_ctrl_locked > 0)
-				ret = 0;
-			break;
-		case MSM8X16_WCD_A_CDC_TX1_VOL_CTL_GAIN:
-		case MSM8X16_WCD_A_CDC_TX2_VOL_CTL_GAIN:
 			if (snd_ctrl_locked > 0)
 				ret = 0;
 			break;
@@ -135,52 +104,6 @@ static bool calc_checksum(unsigned int a, unsigned int b, unsigned int c)
 	} else {
 		return false;
 	}
-}
-
-static ssize_t cam_mic_gain_show(struct kobject *kobj,
-		struct kobj_attribute *attr, char *buf)
-{
-        return sprintf(buf, "%u\n",
-		msm8x16_wcd_read(fauxsound_codec_ptr,
-			MSM8X16_WCD_A_CDC_TX1_VOL_CTL_GAIN));
-
-}
-
-static ssize_t cam_mic_gain_store(struct kobject *kobj,
-		struct kobj_attribute *attr, const char *buf, size_t count)
-{
-	unsigned int lval, chksum;
-
-	sscanf(buf, "%u %u", &lval, &chksum);
-
-	if (calc_checksum(lval, 0, chksum)) {
-		msm8x16_wcd_write(fauxsound_codec_ptr,
-			MSM8X16_WCD_A_CDC_TX1_VOL_CTL_GAIN, lval);
-	}
-	return count;
-}
-
-static ssize_t mic_gain_show(struct kobject *kobj,
-		struct kobj_attribute *attr, char *buf)
-{
-	return sprintf(buf, "%u\n",
-		msm8x16_wcd_read(fauxsound_codec_ptr,
-			MSM8X16_WCD_A_CDC_TX2_VOL_CTL_GAIN));
-}
-
-static ssize_t mic_gain_store(struct kobject *kobj,
-		struct kobj_attribute *attr, const char *buf, size_t count)
-{
-	unsigned int lval, chksum;
-
-	sscanf(buf, "%u %u", &lval, &chksum);
-
-	if (calc_checksum(lval, 0, chksum)) {
-		msm8x16_wcd_write(fauxsound_codec_ptr,
-			MSM8X16_WCD_A_CDC_TX2_VOL_CTL_GAIN, lval);
-	}
-	return count;
-
 }
 
 static ssize_t speaker_gain_show(struct kobject *kobj,
@@ -235,45 +158,6 @@ static ssize_t headphone_gain_store(struct kobject *kobj,
 	}
 	return count;
 }
-
-/*
-static ssize_t headphone_pa_gain_show(struct kobject *kobj,
-		struct kobj_attribute *attr, char *buf)
-{
-	return sprintf(buf, "%u %u\n",
-		msm8x16_wcd_read(fauxsound_codec_ptr, MSM8X16_WCD_A_RX_HPH_L_GAIN),
-		msm8x16_wcd_read(fauxsound_codec_ptr, MSM8X16_WCD_A_RX_HPH_R_GAIN));
-}
-
-static ssize_t headphone_pa_gain_store(struct kobject *kobj,
-		struct kobj_attribute *attr, const char *buf, size_t count)
-{
-	unsigned int lval, rval, chksum;
-	unsigned int gain, status;
-	unsigned int out;
-
-	sscanf(buf, "%u %u %u", &lval, &rval, &chksum);
-
-	if (calc_checksum(lval, rval, chksum)) {
-	gain = msm8x16_wcd_read(fauxsound_codec_ptr, MSM8X16_WCD_A_RX_HPH_L_GAIN);
-	out = (gain & 0xf0) | lval;
-	msm8x16_wcd_write(fauxsound_codec_ptr, MSM8X16_WCD_A_RX_HPH_L_GAIN, out);
-
-	status = msm8x16_wcd_read(fauxsound_codec_ptr, MSM8X16_WCD_A_RX_HPH_L_STATUS);
-	out = (status & 0x0f) | (lval << 4);
-	msm8x16_wcd_write(fauxsound_codec_ptr, MSM8X16_WCD_A_RX_HPH_L_STATUS, out);
-
-	gain = msm8x16_wcd_read(fauxsound_codec_ptr, MSM8X16_WCD_A_RX_HPH_R_GAIN);
-	out = (gain & 0xf0) | rval;
-	msm8x16_wcd_write(fauxsound_codec_ptr, MSM8X16_WCD_A_RX_HPH_R_GAIN, out);
-
-	status = msm8x16_wcd_read(fauxsound_codec_ptr, MSM8X16_WCD_A_RX_HPH_R_STATUS);
-	out = (status & 0x0f) | (rval << 4);
-	msm8x16_wcd_write(fauxsound_codec_ptr, MSM8X16_WCD_A_RX_HPH_R_STATUS, out);
-	}
-	return count;
-}
-*/
 
 static unsigned int selected_reg = 0xdeadbeef;
 
@@ -351,18 +235,6 @@ static struct kobj_attribute sound_reg_write_attribute =
 		NULL,
 		sound_reg_write_store);
 
-static struct kobj_attribute cam_mic_gain_attribute =
-	__ATTR(gpl_cam_mic_gain,
-		0666,
-		cam_mic_gain_show,
-		cam_mic_gain_store);
-
-static struct kobj_attribute mic_gain_attribute =
-	__ATTR(gpl_mic_gain,
-		0666,
-		mic_gain_show,
-		mic_gain_store);
-
 static struct kobj_attribute speaker_gain_attribute =
 	__ATTR(gpl_speaker_gain,
 		0666,
@@ -374,14 +246,6 @@ static struct kobj_attribute headphone_gain_attribute =
 		0666,
 		headphone_gain_show,
 		headphone_gain_store);
-
-/*
-static struct kobj_attribute headphone_pa_gain_attribute =
-	__ATTR(gpl_headphone_pa_gain,
-		0666,
-		headphone_pa_gain_show,
-		headphone_pa_gain_store);
-*/
 
 static struct kobj_attribute sound_control_locked_attribute =
 	__ATTR(gpl_sound_control_locked,
@@ -396,11 +260,8 @@ static struct kobj_attribute sound_control_version_attribute =
 
 static struct attribute *sound_control_attrs[] =
 	{
-		&cam_mic_gain_attribute.attr,
-		&mic_gain_attribute.attr,
 		&speaker_gain_attribute.attr,
 		&headphone_gain_attribute.attr,
-//		&headphone_pa_gain_attribute.attr,
 		&sound_control_locked_attribute.attr,
 		&sound_reg_sel_attribute.attr,
 		&sound_reg_read_attribute.attr,
