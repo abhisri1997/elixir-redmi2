@@ -1,3 +1,4 @@
+dtbToolCM -2 -o $KERNEL_DIR/arch/arm/boot/dt.img -s 2048 -p $KERNEL_DIR/scripts/dtc/ $KERNEL_DIR/arch/arm/boot/dts/
 echo -e "Copying zImage to output directory.....\n"
 cp ~/Xiaomi/arch/arm/boot/zImage ~/Output/Redmi2/raw/
 cp ~/Xiaomi/arch/arm/boot/zImage ~/Output/Redmi2/zip/
