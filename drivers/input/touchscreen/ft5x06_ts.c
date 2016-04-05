@@ -31,13 +31,6 @@
 #include <linux/debugfs.h>
 #include <linux/sensors.h>
 #include <linux/input/ft5x06_ts.h>
-#include <linux/power_supply.h>
-
-
-#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
-#include <linux/input/doubletap2wake.h>
-#endif
- 
 
 #if defined(CONFIG_FB)
 #include <linux/notifier.h>
@@ -130,6 +123,11 @@
 #define FT_FW_START_REG		0xBF
 
 #define FT_STATUS_NUM_TP_MASK	0x0F
+
+#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
+#include <linux/input/prevent_sleep.h>
+bool dit_suspend = false;
+#endif
 
 #define FT_VTG_MIN_UV		2600000
 #define FT_VTG_MAX_UV		3300000
@@ -244,17 +242,6 @@ enum {
 				fw_sub_min)
 
 #define FT_DEBUG_DIR_NAME	"ts_debug"
-
-#ifdef CONFIG_MACH_WT88047
-#define CTP_CHARGER_DETECT 0
-#endif
-
-#if CTP_CHARGER_DETECT
-extern int power_supply_get_battery_charge_state(struct power_supply *psy);
-struct power_supply *batt_psy;
-static u8 is_charger_plug;
-static u8 pre_charger_status;
-#endif
 
 struct ft5x06_ts_data {
 	struct i2c_client *client;
@@ -716,21 +703,6 @@ static irqreturn_t ft5x06_ts_interrupt(int irq, void *dev_id)
 		return IRQ_HANDLED;
 	}
 
-#if CTP_CHARGER_DETECT
-	if (!batt_psy) {
-		pr_err("%s: tp interrupt battery supply not found\n", __func__);
-		batt_psy = power_supply_get_by_name("usb");
-	} else {
-		is_charger_plug = (u8)power_supply_get_battery_charge_state(batt_psy);
-		pr_debug("%s: 1 is_charger_plug %d, prev %d", __func__, is_charger_plug, pre_charger_status);
-		if (is_charger_plug != pre_charger_status) {
-			pre_charger_status = is_charger_plug;
-			ft5x0x_write_reg(data->client, 0x8B, is_charger_plug);
-			pr_debug("%s: 2 is_charger_plug %d, prev %d", __func__, is_charger_plug, pre_charger_status);
-		}
-	}
-#endif
-
 	ip_dev = data->input_dev;
 	buf = data->tch_data;
 
@@ -1058,6 +1030,15 @@ static int ft5x06_ts_start(struct device *dev)
 {
 	struct ft5x06_ts_data *data = dev_get_drvdata(dev);
 	int err;
+	bool prevent_sleep = false;
+#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
+	ts_get_prevent_sleep(prevent_sleep);
+	if (prevent_sleep) {
+		/* enable the key panel touches back again */
+		__set_bit(EV_KEY, data->input_dev->evbit);
+		input_sync(data->input_dev);
+	}
+#endif
 
 	if (data->pdata->power_on) {
 		err = data->pdata->power_on(true);
@@ -1095,18 +1076,12 @@ static int ft5x06_ts_start(struct device *dev)
 
 	msleep(data->pdata->soft_rst_dly);
 
-	enable_irq(data->client->irq);
-#if CTP_CHARGER_DETECT
-	batt_psy = power_supply_get_by_name("usb");
-	if (!batt_psy) {
-		pr_err("%s: tp resume battery supply not found\n", __func__);
+	if (prevent_sleep) {
+		disable_irq_wake(data->client->irq);
 	} else {
-		is_charger_plug = (u8)power_supply_get_battery_charge_state(batt_psy);
-		pr_debug("%s: is_charger_plug %d, prev %d", __func__, is_charger_plug, pre_charger_status);
-		ft5x0x_write_reg(data->client, 0x8B, is_charger_plug);
+		enable_irq(data->client->irq);
 	}
-	pre_charger_status = is_charger_plug;
-#endif
+
 	data->suspended = false;
 
 	return 0;
@@ -1136,7 +1111,18 @@ static int ft5x06_ts_stop(struct device *dev)
 	char txbuf[2];
 	int i, err;
 
-	disable_irq(data->client->irq);
+	bool prevent_sleep = false;
+#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
+	ts_get_prevent_sleep(prevent_sleep);
+#endif
+
+	if (!prevent_sleep) {
+		disable_irq(data->client->irq);
+		dit_suspend = false;
+	} else {
+		enable_irq_wake(data->client->irq);
+		dit_suspend = true;
+	}
 
 	/* release all touches */
 	for (i = 0; i < data->pdata->num_max_touches; i++) {
@@ -1148,7 +1134,8 @@ static int ft5x06_ts_stop(struct device *dev)
 
 	if (gpio_is_valid(data->pdata->reset_gpio)) {
 		txbuf[0] = FT_REG_PMODE;
-		txbuf[1] = FT_PMODE_HIBERNATE;
+		txbuf[1] = (!prevent_sleep) ? FT_PMODE_HIBERNATE :
+			FT_PMODE_MONITOR;
 		ft5x06_i2c_write(data->client, txbuf, sizeof(txbuf));
 	}
 
@@ -1182,6 +1169,14 @@ static int ft5x06_ts_stop(struct device *dev)
 
 	data->suspended = true;
 
+#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
+	if (prevent_sleep) {
+		/* disable the key panel touches */
+		__clear_bit(EV_KEY, data->input_dev->evbit);
+		input_sync(data->input_dev);
+	}
+#endif
+
 	return 0;
 
 gpio_configure_fail:
@@ -1214,13 +1209,6 @@ static int ft5x06_ts_suspend(struct device *dev)
 {
 	struct ft5x06_ts_data *data = dev_get_drvdata(dev);
 	int err;
-
-#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
- 	bool prevent_sleep = (dt2w_switch > 0);
- 	if (prevent_sleep) {
- 		disable_irq_wake(data->client->irq);
- 	} else {
- #endif
 
 	if (data->loading_fw) {
 		dev_info(dev, "Firmware loading in process...\n");
@@ -1256,9 +1244,7 @@ static int ft5x06_ts_suspend(struct device *dev)
 		data->suspended = true;
 		return err;
 	}
-#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
-	}
-#endif
+
 	return ft5x06_ts_stop(dev);
 }
 
@@ -1266,13 +1252,6 @@ static int ft5x06_ts_resume(struct device *dev)
 {
 	struct ft5x06_ts_data *data = dev_get_drvdata(dev);
 	int err;
-
-#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
- 	bool prevent_sleep = (dt2w_switch > 0);
- 	if (prevent_sleep) {
- 		enable_irq_wake(data->client->irq);
- 	} else {
- #endif
 
 	if (!data->suspended) {
 		dev_dbg(dev, "Already in awake state\n");
@@ -1322,10 +1301,6 @@ static int ft5x06_ts_resume(struct device *dev)
 		data->suspended = false;
 		data->gesture_pdata->in_pocket = 0;
 	}
-
-#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
- 	}
- #endif
 	return 0;
 }
 
@@ -1359,30 +1334,21 @@ static int fb_notifier_callback(struct notifier_block *self,
 	struct ft5x06_ts_data *ft5x06_data =
 		container_of(self, struct ft5x06_ts_data, fb_notif);
 
-#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
- 	bool prevent_sleep = (dt2w_switch > 0);
- 			if (prevent_sleep) {
- 				ft5x06_ts_resume(&ft5x06_data->client->dev);
- 				return 0;
- 			} else {
- #endif
-
 	if (evdata && evdata->data && event == FB_EVENT_BLANK &&
 			ft5x06_data && ft5x06_data->client) {
 		blank = evdata->data;
-                /*Edited from pirej latest commit*/
-		if (*blank == FB_BLANK_UNBLANK || *blank == FB_BLANK_VSYNC_SUSPEND) {
-			if (unblanked_once)
+		if (*blank == FB_BLANK_UNBLANK) {
+			if (unblanked_once) {
+				pr_info("ft5x06 resume!\n");
 				ft5x06_ts_resume(&ft5x06_data->client->dev);
+			}
 		} else if (*blank == FB_BLANK_POWERDOWN) {
 			unblanked_once = true;
+			pr_info("ft5x06 suspend!\n");
 			ft5x06_ts_suspend(&ft5x06_data->client->dev);
 		}
 	}
 
-#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
-	}
-#endif
 	return 0;
 }
 #elif defined(CONFIG_HAS_EARLYSUSPEND)
@@ -2337,14 +2303,12 @@ static int ft5x06_ts_probe(struct i2c_client *client,
 	* the interrupt trigger mode will be set in Device Tree with property
 	* "interrupts", so here we just need to set the flag IRQF_ONESHOT
 	*/
-
-#ifdef CONFIG_TOUCHSCREEN_DOUBLETAP2WAKE
- 	IRQF_ONESHOT | IRQF_NO_SUSPEND,
- 	client->dev.driver->name, data);
-#else
+#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
 				IRQF_ONESHOT,
-				client->dev.driver->name, data);
+#else
+				IRQF_ONESHOT | IRQF_NO_SUSPEND,
 #endif
+				client->dev.driver->name, data);
 	if (err) {
 		dev_err(&client->dev, "request irq failed\n");
 		goto free_gpio;
@@ -2546,12 +2510,6 @@ static int ft5x06_ts_probe(struct i2c_client *client,
 	data->early_suspend.suspend = ft5x06_ts_early_suspend;
 	data->early_suspend.resume = ft5x06_ts_late_resume;
 	register_early_suspend(&data->early_suspend);
-#endif
-
-#if CTP_CHARGER_DETECT
-	batt_psy = power_supply_get_by_name("usb");
-	if (!batt_psy)
-		pr_err("%s: tp battery supply not found\n", __func__);
 #endif
 
 	return 0;
