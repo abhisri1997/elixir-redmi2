@@ -1,1 +1,99 @@
-
+{
+  "name": "<b><font color=\"#FFFFFF\">ELiX1R</font></b>",
+  "short_description": "A kernel by <b>Abhinav Srivastava</b>",
+  "long_description": "Welcome to <b>ELiX1R Kernel</b>! This is my first project for my Android. In this Application you can find all advanced kernel features!<br><br>I am a techy guy and always want to learn new things.<br><a href=\"http://github.com/dev-elixir\">My Github Profile</a>",
+  "logo": "http://s30.postimg.org/3nu4hy72p/47074_158249370855522_156837157663410_535304_123.jpg",
+  "xda": "forum.xda-developers.com/redmi-2/development/kernel-elix1r-kernel-t3342336",
+  "github": "https://github.com/dev-elixir/elixir-redmi2",
+  "facebook": "http://facebook.com/androauthor",
+  "contact": "http://facebook.com/abhishree143",
+  "features": [
+    "Build with Google Toolchain 4.8",
+    {
+      "name": "CPU Governors",
+      "items": [
+        "interactive (default)",
+        "ondemand",
+        "userspace",
+        "powersave",
+        "performance",
+        "darkness",
+        "elementalx",
+        "yankactive",
+        "lionfish",
+        "conservative"
+      ]
+    },
+    {
+      "name": "GPU Governors",
+      "items": [
+        "bw_hwmon",
+        "msm-adreno-tz (default)",
+        "bw_vbif",
+        "gpubw_mon",
+        "cpufreq",
+        "userspace",
+        "powersave",
+        "performance",
+        "simple_ondemand"
+      ]
+    },
+    {
+      "name": "I/O Schedulers",
+      "items": [
+        "noop",
+        "deadline",
+        "row",
+        "cfq",
+        "bfq (default)"
+      ]
+    },
+    "LZ4",
+    "f2fs",
+    "Battery Control",
+    "Vibration Control",
+    "zRam",
+    "Faux Sound Control V3.0",
+    "Init.d scripts",
+    "Fast ShutDown",
+    "Powersuspend Feature",
+    "Color Intensity Control",
+    "Fast USB Charge",
+    "UnderVolted upto Some Extend to reduce voltage",
+    "Maximum Current Input Increased to 1500Ampere",
+    "SeLinux: Set to Permissive",
+    "Added DT2W",
+    "Added CPU Idle Governor",
+    "Stability Fixes"
+  ],
+  "downloads": [
+    {
+      "name": "ST1.0",
+      "description": "<b>Only for <i>6.0.X</i> and more stable for <i>CM based ROMs</i></b>",
+      "url": "https://ny1.androidfilehost.com/dl/W3jKp4Wu_sobdp2iaKUTjg/1460188150/24459283995302599/Elixir_Kernel_Thomas_Redmi2_R1%2821-03-16%29.zip",
+      "md5sum": "9a0e0ab833f1d97dfaaf49867c76812b",
+      "changelog": [
+        "Stable without added Governors and features."
+      ]
+    },
+    {
+      "name": "ST1.2",
+      "description": "<b>Only for <i>6.0.X</i> and more stable for <i>CM based ROMs</i></b>",
+      "url": "https://ny1.androidfilehost.com/dl/cjIqT8vnc4DPfQ3NxvvYTw/1460189110/24459283995306968/ELiX1R-R2_THOMAS-REDMI2%2827-03%29-Beta.zip",
+      "md5sum": "bf3d1f3a6b2da4a3a1308e579fce3b8f",
+      "changelog": [
+        "Added Governors and DT2W",
+        "Added features like FauxSound"
+      ]
+    },
+    {
+      "name": "ST1.4",
+      "description": "<b>Only for <i>6.0.X</i> and more stable for<i>CM based ROMs</i></b>",
+      "url": "https://ny1.androidfilehost.com/dl/rRLofLFJEQfKHwaHGAKNbg/1460191531/24459283995314321/ELiX1R-R2_THOMAS-REDMI2%2806-04-16%29-.zip",
+      "md5sum": "00de9233fb1038f3fed752b83013e352",
+      "changelog": [
+        "Stability for kernel."
+      ]
+    }
+  ]
+}
